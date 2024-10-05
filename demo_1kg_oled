@@ -1,0 +1,104 @@
+#include <Arduino.h>
+#include <U8g2lib.h>
+
+#ifdef U8X8_HAVE_HW_SPI
+#include <SPI.h>
+#endif
+#ifdef U8X8_HAVE_HW_I2C
+#include <Wire.h>
+#endif
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "HX711.h"
+HX711 scale;
+
+
+
+
+//U8G2_SSD1306_128X64_NONAME_1_4W_HW_SPI u8g2(U8G2_R0, /* cs=*/ 10, /* dc=*/ 9, /* reset=*/ 8);
+U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/
+                                        U8X8_PIN_NONE);
+
+char buffer[33];
+String name = "gg";  //in SRAM
+
+const int LOADCELL_DOUT_PIN = 6;
+const int LOADCELL_SCK_PIN = 7;
+float sensorvalue = 0;
+float maxvalue = 0;
+
+
+
+void setup(void) {
+  Serial.begin(9600);
+  Serial.println("-------> HX711 Demo");
+  Serial.println("Initializing the scale");
+
+
+// Serial.println("Before setting up the scale:");
+ // Serial.print("read: \t\t");
+  //Serial.println(scale.read());  // print a raw reading from the ADC
+
+  // Initialize library with data output pin, clock input pin and gain factor.
+  // Channel selection is made by passing the appropriate gain:
+  // - With a gain factor of 64 or 128, channel A is selected
+  // - With a gain factor of 32, channel B is selected
+  // By omitting the gain factor parameter, the library
+  // default "128" (Channel A) is used here.
+  scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
+
+  scale.set_scale(2280.f);  // this value is obtained by calibrating the scale with known weights; see the README for details
+  scale.tare();             // reset the scale to 0
+
+
+
+  // oled stuff
+  u8g2.begin();
+  u8g2.setFont(u8g2_font_ncenB08_tr);  // choose a suitable font
+}
+
+void loop(void) {
+
+  String fixed = F("COPY from FLASH");
+  int sensorval_bar_y = 0;
+  int sensormax_bar_y = 0;
+
+  sensorvalue = scale.get_units(1);
+  
+  if (sensorvalue > maxvalue) {
+    maxvalue = sensorvalue;
+  }
+
+    sensorval_bar_y = 60 - sensorvalue/10;
+    sensormax_bar_y = 60 - maxvalue/10;
+
+
+
+    u8g2.firstPage();
+  do {
+    u8g2.drawStr(0, 10, "Hello Scale!");  // write something to the internal memory
+    //u8g2.drawStr(10, 20, name.c_str());  // write something to the internal memory
+    //u8g2.drawStr(5, 30, fixed.c_str());  // write String from SRAM
+
+    //u8g2.drawStr(0, 40, F("ORIGINAL IN FLASH").c_str());  // does not work
+
+    u8g2.setCursor(0, 20);          //separate setCursor(), print() accepts all Print.h arguments
+    u8g2.print(F("sensor value"));  //
+    u8g2.drawStr(0, 30, itoa(sensorvalue, buffer, 10));
+    u8g2.drawStr(100, sensorval_bar_y, itoa(sensorvalue, buffer, 10));    
+    u8g2.drawLine(80, sensorval_bar_y, 90, sensorval_bar_y);
+
+
+    u8g2.setCursor(0, 50);       //separate setCursor(), print() accepts all Print.h arguments
+    u8g2.print(F("max value"));  
+    u8g2.drawStr(0, 60, itoa(maxvalue, buffer, 10));    
+    u8g2.drawLine(80, sensormax_bar_y, 90, sensormax_bar_y);
+
+
+
+
+  } while (u8g2.nextPage());
+  //delay(1000);
+}
